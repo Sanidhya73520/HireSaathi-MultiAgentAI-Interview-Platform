@@ -1,0 +1,70 @@
+# ==============================
+# Node.js Dependencies
+# ==============================
+node_modules/
+**/node_modules/
+
+
+# ==============================
+# Environment Variables / Secrets
+# ==============================
+.env
+.env.*
+!.env.example
+
+
+# ==============================
+# Build / Production Files
+# ==============================
+dist/
+build/
+**/dist/
+**/build/
+
+
+# ==============================
+# Logs
+# ==============================
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+
+# ==============================
+# Uploads / User Generated Files
+# ==============================
+backend/services/uploads/
+backend/services/resume/uploads/
+uploads/
+
+
+# ==============================
+# Coverage / Testing
+# ==============================
+coverage/
+.nyc_output/
+
+
+# ==============================
+# OS Generated Files
+# ==============================
+.DS_Store
+Thumbs.db
+
+
+# ==============================
+# IDE / Editor
+# ==============================
+.vscode/
+.idea/
+
+
+# ==============================
+# Temporary Files
+# ==============================
+*.tmp
+*.temp
+
+# Firebase service account
+**/serviceAccountKey.json
