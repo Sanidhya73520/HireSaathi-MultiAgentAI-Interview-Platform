@@ -2,25 +2,44 @@ import { ChatGroq } from "@langchain/groq";
 import dotenv from "dotenv";
 dotenv.config();
 
-const rawKey = process.env.GROQ_API_KEY ? process.env.GROQ_API_KEY.trim().replace(/^["']|["']$/g, "") : "";
-const rawModel = process.env.GROQ_MODEL ? process.env.GROQ_MODEL.trim().replace(/^["']|["']$/g, "") : "";
-const model =
-  rawModel && !rawModel.includes("gpt-oss") && !rawModel.startsWith("openai/")
+const rawKey = process.env.GROQ_API_KEY
+  ? process.env.GROQ_API_KEY.trim().replace(/^["']|["']$/g, "")
+  : "";
+const rawModel = process.env.GROQ_MODEL
+  ? process.env.GROQ_MODEL.trim().replace(/^["']|["']$/g, "")
+  : "";
+
+// Default to openai/gpt-oss-120b; if user set another model, use that as primary
+const primaryModel =
+  rawModel && rawModel !== "llama-3.3-70b-versatile"
     ? rawModel
-    : "llama-3.3-70b-versatile";
+    : "openai/gpt-oss-120b";
 
-if (!rawKey) {
-  console.warn("⚠️ [Resume LLM] GROQ_API_KEY is not set or empty in environment variables!");
-} else {
-  console.log(`✅ [Resume LLM] Configured with model: ${model}`);
-}
+const candidateModels = [
+  primaryModel,
+  "openai/gpt-oss-120b",
+  "openai/gpt-oss-20b",
+  "llama-3.1-8b-instant",
+  "qwen/qwen3.8-27b",
+];
 
-const llm = new ChatGroq({
-  model,
-  temperature: 0.2,
-  maxTokens: 2500,
-  maxRetries: 2,
-  ...(rawKey ? { apiKey: rawKey } : {}),
-});
+const uniqueModels = [...new Set(candidateModels)];
+
+const createLlm = (modelName) =>
+  new ChatGroq({
+    model: modelName,
+    temperature: 0.2,
+    maxTokens: 2500,
+    maxRetries: 1,
+    ...(rawKey ? { apiKey: rawKey } : {}),
+  });
+
+const primaryLlm = createLlm(uniqueModels[0]);
+const fallbackLlms = uniqueModels.slice(1).map(createLlm);
+
+const llm =
+  fallbackLlms.length > 0
+    ? primaryLlm.withFallbacks({ fallbacks: fallbackLlms })
+    : primaryLlm;
 
 export default llm;
