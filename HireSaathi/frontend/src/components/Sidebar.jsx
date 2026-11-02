@@ -2,9 +2,11 @@ import React from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { RiBookShelfFill } from "react-icons/ri";
 import {
+  FiExternalLink,
   FiFileText,
   FiLogOut,
   FiMap,
+  FiMessageSquare,
   FiPlus,
   FiSidebar,
   FiStar,
@@ -28,6 +30,12 @@ const NAV_ITEMS = [
     icon: <FiMap size={15} />,
     label: "Roadmap Builder",
     path: "/roadmap",
+  },
+  {
+    icon: <FiMessageSquare size={15} />,
+    label: "The One - AI Chatbot",
+    path: "https://the-one-multi-agent-ai-platform-seven.vercel.app/",
+    external: true,
   },
 ];
 function Sidebar({
@@ -126,23 +134,43 @@ function Sidebar({
       </AnimatePresence>
 
       <nav className="flex flex-col gap-0.5 px-2.5 flex-1">
-        {NAV_ITEMS.map((nav, i) => (
-          <motion.button
-            onClick={() => {
-              navigate(nav.path);
-              setMobileOpen(false);
-            }}
-            whileHover={{ x: sidebarOpen ? 3 : 0 }}
-            transition={{ duration: 0.13 }}
-            key={i}
-            className={`flex items-center gap-2.5 rounded-lg py-2 transition-all text-xs font-medium text-black/45 hover:text-[#0A0A0A] hover:bg-black/5 cursor-pointer ${sidebarOpen ? "px-2.5" : "justify-center px-0"}`}
-          >
-            <span className="shrink-0">{nav.icon}</span>
-            {sidebarOpen && (
-              <span className="whitespace-nowrap">{nav.label}</span>
-            )}
-          </motion.button>
-        ))}
+        {NAV_ITEMS.map((nav, i) =>
+          nav.external ? (
+            <motion.a
+              key={i}
+              href={nav.path}
+              target="_blank"
+              rel="noopener noreferrer"
+              whileHover={{ x: sidebarOpen ? 3 : 0 }}
+              transition={{ duration: 0.13 }}
+              className={`flex items-center gap-2.5 rounded-lg py-2 transition-all text-xs font-medium text-black/45 hover:text-[#0A0A0A] hover:bg-black/5 cursor-pointer ${sidebarOpen ? "px-2.5" : "justify-center px-0"}`}
+            >
+              <span className="shrink-0">{nav.icon}</span>
+              {sidebarOpen && (
+                <span className="whitespace-nowrap flex items-center gap-1.5 flex-1 justify-between">
+                  {nav.label}
+                  <FiExternalLink size={11} className="opacity-60" />
+                </span>
+              )}
+            </motion.a>
+          ) : (
+            <motion.button
+              onClick={() => {
+                navigate(nav.path);
+                setMobileOpen(false);
+              }}
+              whileHover={{ x: sidebarOpen ? 3 : 0 }}
+              transition={{ duration: 0.13 }}
+              key={i}
+              className={`flex items-center gap-2.5 rounded-lg py-2 transition-all text-xs font-medium text-black/45 hover:text-[#0A0A0A] hover:bg-black/5 cursor-pointer ${sidebarOpen ? "px-2.5" : "justify-center px-0"}`}
+            >
+              <span className="shrink-0">{nav.icon}</span>
+              {sidebarOpen && (
+                <span className="whitespace-nowrap">{nav.label}</span>
+              )}
+            </motion.button>
+          ),
+        )}
       </nav>
       {/* coins */}
       <div className="border-t border-black/8 p-2.5 shrink-0">
