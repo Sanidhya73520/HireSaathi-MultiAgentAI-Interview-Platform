@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { FiX } from "react-icons/fi";
 import { motion } from "motion/react";
 import { FcGoogle } from "react-icons/fc";
@@ -7,8 +7,13 @@ import { auth, provider } from "../utils/firebase";
 import api from "../utils/axios";
 
 function LoginModel({ onClose, setUser }) {
+  const [errorMsg, setErrorMsg] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const handleGoogleAuth = async () => {
     try {
+      setErrorMsg("");
+      setLoading(true);
       const result = await signInWithPopup(auth, provider);
       // to get uid token
       const token = await result.user.getIdToken();
@@ -18,9 +23,17 @@ function LoginModel({ onClose, setUser }) {
       setUser(response?.data?.user);
       onClose();
     } catch (error) {
-      console.log(error);
+      console.error("Authentication Error:", error);
+      setErrorMsg(
+        error?.response?.data?.message ||
+          error.message ||
+          "Failed to sign in. Please try again.",
+      );
+    } finally {
+      setLoading(false);
     }
   };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md px-4">
       <div className="relative w-full max-w-sm bg-[#0A0A0A]/80 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.25)]">
@@ -41,16 +54,24 @@ function LoginModel({ onClose, setUser }) {
           <p className="text-white/45 text-center text-xs">
             Continue your AI interview journey
           </p>
+
+          {errorMsg && (
+            <div className="mt-4 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs text-center">
+              {errorMsg}
+            </div>
+          )}
+
           <div className="mt-7">
             <motion.button
               onClick={handleGoogleAuth}
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.97 }}
-              className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-white/15 bg-white/10 backdrop-blur-md hover:border-white/25 hover:bg-white/[0.14] shadow-inner transition-all"
+              disabled={loading}
+              whileHover={{ scale: loading ? 1 : 1.04 }}
+              whileTap={{ scale: loading ? 1 : 0.97 }}
+              className="w-full flex items-center justify-center gap-3 py-3 rounded-xl border border-white/15 bg-white/10 backdrop-blur-md hover:border-white/25 hover:bg-white/[0.14] shadow-inner transition-all disabled:opacity-50"
             >
               <FcGoogle size={18} />
               <span className="text-white font-medium text-sm">
-                Continue With Google
+                {loading ? "Signing in..." : "Continue With Google"}
               </span>
             </motion.button>
           </div>
