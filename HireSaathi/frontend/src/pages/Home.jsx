@@ -6,7 +6,7 @@ import LoginModel from "../components/LoginModel";
 import { useState } from "react";
 import { FaArrowRight } from "react-icons/fa";
 import dashboard from "../assets/home_dashboard.png";
-import { FiBarChart2, FiFileText, FiMap, FiMic } from "react-icons/fi";
+import { FiBarChart2, FiFileText, FiMap, FiMic, FiExternalLink } from "react-icons/fi";
 
 function Home({ setUser }) {
   const [showlogin, setshowlogin] = useState(false);
@@ -30,14 +30,27 @@ function Home({ setUser }) {
           </div>
         </div>
 
-        <motion.button
-          onClick={() => setshowlogin(true)}
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.97 }}
-          className="bg-[#0A0A0A]/80 backdrop-blur-2xl text-white font-semibold border border-white/10 rounded-md px-3 py-1.5 text-xs cursor-pointer transition-all hover:border-white/20 shadow-[0_8px_24px_rgba(0,0,0,0.25)] flex items-center gap-2"
-        >
-          Log In <CgLogIn />
-        </motion.button>
+        <div className="flex items-center gap-3">
+          <motion.a
+            href="https://the-one-multi-agent-ai-platform-seven.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.97 }}
+            className="bg-[#0A0A0A]/80 backdrop-blur-2xl text-white font-semibold border border-white/10 rounded-md px-3 py-1.5 text-xs cursor-pointer transition-all hover:border-white/20 shadow-[0_8px_24px_rgba(0,0,0,0.25)] flex items-center gap-1.5"
+          >
+            The One - AI Chatbot <FiExternalLink size={12} className="opacity-80" />
+          </motion.a>
+
+          <motion.button
+            onClick={() => setshowlogin(true)}
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.97 }}
+            className="bg-[#0A0A0A]/80 backdrop-blur-2xl text-white font-semibold border border-white/10 rounded-md px-3 py-1.5 text-xs cursor-pointer transition-all hover:border-white/20 shadow-[0_8px_24px_rgba(0,0,0,0.25)] flex items-center gap-2"
+          >
+            Log In <CgLogIn />
+          </motion.button>
+        </div>
       </motion.nav>
 
       {/* main area */}
