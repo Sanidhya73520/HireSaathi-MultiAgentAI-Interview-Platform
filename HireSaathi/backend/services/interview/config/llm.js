@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const llm = new ChatGroq({
-  model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+  model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
   temperature: 0.2,
   maxRetries: 2,
   ...(process.env.GROQ_API_KEY ? { apiKey: process.env.GROQ_API_KEY } : {}),
