@@ -28,6 +28,7 @@ function Step2interview({ interviewData, user }) {
     interviewData.currentQuestion || 0,
   );
   const [answer, setAnswer] = useState("");
+  const [interimText, setInterimText] = useState("");
   const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(interviewData.question.timer || 60);
@@ -50,42 +51,135 @@ function Step2interview({ interviewData, user }) {
   const userVideoRef = useRef(null);
   const recognitionRef = useRef(null);
   const streamRef = useRef(null);
+  const interimRef = useRef("");
+  const micOnRef = useRef(micOn);
+  const isListeningRef = useRef(false);
+  const isAIPlayingRef = useRef(isAIPlaying);
+
+  useEffect(() => {
+    micOnRef.current = micOn;
+  }, [micOn]);
+
+  useEffect(() => {
+    isAIPlayingRef.current = isAIPlaying;
+  }, [isAIPlaying]);
 
   const videoSource = voiceGender === "female" ? femaleVideo : maleVideo;
   const progress = ((currentIndex + 1) / interviewData.totalQuestions) * 100;
   const showMicon = micOn && !isAIPlaying;
 
-  //   Speech recognition
+  // Flushes unfinalized interim speech into the permanent answer string
+  const flushInterim = () => {
+    if (interimRef.current?.trim()) {
+      const chunk = interimRef.current.trim();
+      interimRef.current = "";
+      setInterimText("");
+      setAnswer((prev) => {
+        const base = prev.trim();
+        return base ? `${base} ${chunk}` : chunk;
+      });
+    }
+  };
+
+  // Speech recognition setup with duplicate-free final result accumulation
   useEffect(() => {
-    if (!("webkitSpeechRecognition" in window)) {
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
       console.log("Speech Recognition is not supported in this browser.");
       return;
     }
 
-    const rec = new window.webkitSpeechRecognition();
+    const rec = new SpeechRecognition();
     rec.lang = "en-US";
     rec.continuous = true;
-    rec.interimResults = false;
+    rec.interimResults = true;
+
     rec.onresult = (e) => {
-      const t = e.results[e.results.length - 1][0].transcript;
-      setAnswer((prev) => prev + " " + t);
+      let finalChunk = "";
+      let interimChunk = "";
+
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const transcript = e.results[i][0].transcript;
+        if (e.results[i].isFinal) {
+          finalChunk += transcript + " ";
+        } else {
+          interimChunk += transcript;
+        }
+      }
+
+      interimRef.current = interimChunk;
+      setInterimText(interimChunk);
+
+      if (finalChunk.trim()) {
+        const cleaned = finalChunk.trim();
+        setAnswer((prev) => {
+          const base = prev.trim();
+          return base ? `${base} ${cleaned}` : cleaned;
+        });
+        interimRef.current = "";
+        setInterimText("");
+      }
     };
+
+    rec.onerror = (e) => {
+      if (e.error === "no-speech") return;
+      console.warn("Speech recognition note:", e.error);
+    };
+
+    rec.onend = () => {
+      isListeningRef.current = false;
+      flushInterim();
+      if (micOnRef.current && !isAIPlayingRef.current) {
+        try {
+          rec.start();
+          isListeningRef.current = true;
+        } catch (err) {
+          // ignore already started
+        }
+      }
+    };
+
     recognitionRef.current = rec;
+
+    return () => {
+      try {
+        rec.stop();
+      } catch (err) {
+        // ignore
+      }
+    };
   }, []);
 
   const startMic = () => {
-    recognitionRef.current?.start();
+    if (!recognitionRef.current || isListeningRef.current) return;
+    try {
+      recognitionRef.current.start();
+      isListeningRef.current = true;
+    } catch (err) {
+      console.warn("Failed to start mic:", err.message);
+    }
   };
+
   const stopMic = () => {
-    recognitionRef.current?.stop();
+    if (!recognitionRef.current || !isListeningRef.current) return;
+    try {
+      flushInterim();
+      recognitionRef.current.stop();
+      isListeningRef.current = false;
+    } catch (err) {
+      console.warn("Failed to stop mic:", err.message);
+    }
   };
+
   const toggleMic = () => {
     if (micOn) {
-      stopMic();
       setMicOn(false);
+      stopMic();
     } else {
-      startMic();
       setMicOn(true);
+      startMic();
     }
   };
 
@@ -225,7 +319,12 @@ function Step2interview({ interviewData, user }) {
     if (timeLeft !== 0) return;
     const autoSubmit = async () => {
       await speakText("Time is up. Submitting your answer now.");
-      const finalAnswer = answer.trim() || "No answer provided. Time over";
+      const currentInterim = interimRef.current?.trim() || "";
+      const combined = answer.trim() + (currentInterim ? " " + currentInterim : "");
+      const finalAnswer = combined.trim() || "No answer provided. Time over";
+      setAnswer(finalAnswer);
+      interimRef.current = "";
+      setInterimText("");
       setLoading(true);
       const res = await submitAnswer({
         interviewId: interviewData.interviewId,
@@ -252,18 +351,25 @@ function Step2interview({ interviewData, user }) {
       setQuestion(res.question);
       setCurrentIndex(res.currentQuestion);
       setAnswer("");
+      interimRef.current = "";
+      setInterimText("");
       setFeedback(null);
     };
     autoSubmit();
   }, [timeLeft]);
 
   const submit = async () => {
-    if (!answer.trim()) return;
+    const currentInterim = interimRef.current?.trim() || "";
+    const finalAnswer = (answer.trim() + (currentInterim ? " " + currentInterim : "")).trim();
+    if (!finalAnswer) return;
+    setAnswer(finalAnswer);
+    interimRef.current = "";
+    setInterimText("");
     setTimerActive(false);
     setLoading(true);
     const res = await submitAnswer({
       interviewId: interviewData.interviewId,
-      answer,
+      answer: finalAnswer,
     });
     if (res.completed) {
       setFeedback(res.feedback);
@@ -286,6 +392,8 @@ function Step2interview({ interviewData, user }) {
     setQuestion(res.question);
     setCurrentIndex(res.currentQuestion);
     setAnswer("");
+    interimRef.current = "";
+    setInterimText("");
     setFeedback(null);
   };
   return (
@@ -474,9 +582,17 @@ function Step2interview({ interviewData, user }) {
               />
             </div>
             <div className="flex-1 flex flex-col min-h-0">
-              <label className="text-xs font-medium text-zinc-400 mb-1.5">
-                Your Answer
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-medium text-zinc-400">
+                  Your Answer
+                </label>
+                {showMicon && (
+                  <span className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    Listening...
+                  </span>
+                )}
+              </div>
               <textarea
                 onChange={(e) => setAnswer(e.target.value)}
                 value={answer}
@@ -487,6 +603,12 @@ function Step2interview({ interviewData, user }) {
                 }}
                 className="flex-1 w-full rounded-xl bg-[#17181E] border border-white/8 p-4 text-sm text-white outline-none resize-none focus:border-white/25 transition placeholder-white/20"
               />
+              {interimText && (
+                <div className="mt-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-zinc-300 italic flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                  <span className="truncate">"{interimText}"</span>
+                </div>
+              )}
             </div>
             <div className="mt-3 min-h-[0px]">
               <AnimatePresence>
