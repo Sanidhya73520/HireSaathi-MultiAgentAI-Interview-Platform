@@ -18,21 +18,21 @@ const extractText = async (filePath) => {
 
   if (PDFParseClass) {
     try {
-      const parser = new PDFParseClass(buffer);
+      const parser = new PDFParseClass({ data: buffer });
       const res = await parser.getText();
       if (res && res.text) {
         return res.text;
       }
     } catch (err1) {
-      console.warn("PDFParse(buffer) failed, trying PDFParse({ data: buffer }):", err1.message);
+      console.warn("PDFParse({ data: buffer }) failed, trying PDFParse(buffer):", err1.message);
       try {
-        const parser = new PDFParseClass({ data: buffer });
+        const parser = new PDFParseClass(buffer);
         const res = await parser.getText();
         if (res && res.text) {
           return res.text;
         }
       } catch (err2) {
-        console.warn("PDFParse({ data: buffer }) also failed:", err2.message);
+        console.warn("PDFParse(buffer) also failed:", err2.message);
       }
     }
   }

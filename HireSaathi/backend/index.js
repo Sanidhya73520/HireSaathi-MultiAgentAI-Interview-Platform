@@ -68,8 +68,9 @@ app.use(
 
 // Middleware to inject user ID into headers for unified internal routing
 const injectUserHeader = (req, res, next) => {
-  if (req.user && req.user.userId) {
-    req.headers["x-user-id"] = req.user.userId.toString();
+  const id = req.user?.userId || req.user?._id;
+  if (id) {
+    req.headers["x-user-id"] = id.toString();
   }
   next();
 };
@@ -138,6 +139,15 @@ if (process.env.BILLING_SERVICE_URL) {
   app.use("/api/billing", isAuth, injectUserHeader, billingRouter);
 }
 
+// Global Express Error Handler
+app.use((err, req, res, next) => {
+  console.error("🔥 [Global Express Error]:", err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+  });
+});
+
 // Connect to MongoDB & Start Server
 const startServer = async () => {
   if (process.env.MONGODB_URL) {
@@ -157,4 +167,3 @@ const startServer = async () => {
 };
 
 startServer();
-

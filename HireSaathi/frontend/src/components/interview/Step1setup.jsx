@@ -16,6 +16,7 @@ import { useCoins } from "../../apis/user.api";
 import api from "../../utils/axios";
 import { setResume } from "../../redux/resumeSlice";
 import { startInterview } from "../../apis/interview.api";
+
 function Step1setup({ user, setUser }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -29,11 +30,23 @@ function Step1setup({ user, setUser }) {
 
   const uploadResume = async () => {
     if (!file) {
-      alert("Please select PDF");
+      alert("Please select a PDF file first");
       return;
     }
+
+    if ((user?.interviewCoin || 0) < 50) {
+      alert("Insufficient coins! You need at least 50 coins to upload and analyze your resume.");
+      return;
+    }
+
     try {
       setUploading(true);
+      const formData = new FormData();
+      formData.append("resume", file);
+
+      const response = await api.post("/api/resume/upload", formData);
+
+      // Deduct coins ONLY after upload & analysis succeed
       try {
         const coinResponse = await useCoins({
           coins: 50,
@@ -43,47 +56,64 @@ function Step1setup({ user, setUser }) {
           ...prev,
           interviewCoin: coinResponse?.interviewCoin,
         }));
-      } catch (error) {
-        setUploading(false);
-        alert("Failed to use coins.");
-        return;
+      } catch (coinErr) {
+        console.warn("Coin deduction note:", coinErr.message);
       }
 
-      const formData = new FormData();
-      formData.append("resume", file);
-      const response = await api.post("/api/resume/upload", formData);
       dispatch(setResume(response?.data?.data));
       setUploading(false);
       setFile(null);
     } catch (error) {
-      console.log(error);
-      alert("Upload failed");
+      console.error("Resume upload error:", error);
+      const serverMsg =
+        error?.response?.data?.message ||
+        error.message ||
+        "Upload and analysis failed.";
+      alert(`Upload Failed: ${serverMsg}`);
       setUploading(false);
     }
   };
 
   const start = async () => {
-    setStarting(true);
-    const response = await startInterview({ role, type, useResume, resume });
-    if (response) {
-      try {
-        const coinResponse = await useCoins({
-          coins: 10,
-          action: "start-interview",
-        });
-        setUser((prev) => ({
-          ...prev,
-          interviewCoin: coinResponse?.interviewCoin,
-        }));
-      } catch (error) {
-        setStarting(false);
-        alert("Failed to use coins.");
-        return;
-      }
+    if ((user?.interviewCoin || 0) < 10) {
+      alert("Insufficient coins! You need at least 10 coins to start an interview.");
+      return;
     }
-    setStarting(false);
-    navigate(`/interview/${response.interviewId}`);
+
+    setStarting(true);
+    try {
+      const response = await startInterview({ role, type, useResume, resume });
+      if (response && response.interviewId) {
+        try {
+          const coinResponse = await useCoins({
+            coins: 10,
+            action: "start-interview",
+          });
+          setUser((prev) => ({
+            ...prev,
+            interviewCoin: coinResponse?.interviewCoin,
+          }));
+        } catch (coinErr) {
+          console.warn("Coin deduction note:", coinErr.message);
+        }
+
+        setStarting(false);
+        navigate(`/interview/${response.interviewId}`);
+      } else {
+        alert("Failed to start interview. Server returned an invalid response.");
+        setStarting(false);
+      }
+    } catch (error) {
+      console.error("Interview start error:", error);
+      const serverMsg =
+        error?.response?.data?.message ||
+        error.message ||
+        "Failed to start interview.";
+      alert(`Interview Start Error: ${serverMsg}`);
+      setStarting(false);
+    }
   };
+
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-3 sm:p-5">
       <motion.div
@@ -103,7 +133,7 @@ function Step1setup({ user, setUser }) {
               <span className="text-xs text-zinc-300">Back</span>
             </div>
             <h2 className="mt-4 text-xl sm:text-2xl font-bold text-white leading-snug">
-              WelCome back ,<br />
+              Welcome back ,<br />
               {user?.name}
             </h2>
             <p className="mt-2 text-xs sm:text-sm leading-6 text-zinc-400">
@@ -244,8 +274,8 @@ function Step1setup({ user, setUser }) {
                   </h3>
                   <p className="mt-1 text-xs text-zinc-500 text-center">
                     {resume
-                      ? "Resume detected.Upload a new resume anytime to update your interview questions"
-                      : "Upload your resume to generate personalized interview questions"}
+                      ? "Resume detected. Upload a new resume anytime to update your interview questions."
+                      : "Upload your resume to generate personalized interview questions."}
                   </p>
                   <input
                     type="file"

@@ -58,6 +58,7 @@ const Tag = ({ text, color }) => {
     </div>
   );
 };
+
 const Navbar = ({ label }) => {
   const navigate = useNavigate();
   return (
@@ -83,6 +84,7 @@ const Navbar = ({ label }) => {
     </motion.nav>
   );
 };
+
 function Scorer({ user, setUser }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -91,11 +93,23 @@ function Scorer({ user, setUser }) {
 
   const uploadResume = async () => {
     if (!file) {
-      alert("Please select PDF");
+      alert("Please select a PDF file first.");
       return;
     }
+
+    if ((user?.interviewCoin || 0) < 10) {
+      alert("Insufficient coins! You need at least 10 coins to analyze a resume.");
+      return;
+    }
+
     try {
       setLoading(true);
+      const formData = new FormData();
+      formData.append("resume", file);
+
+      const response = await api.post("/api/resume/upload", formData);
+
+      // Deduct coins ONLY after upload & analysis succeed
       try {
         const coinResponse = await useCoins({
           coins: 10,
@@ -105,26 +119,24 @@ function Scorer({ user, setUser }) {
           ...prev,
           interviewCoin: coinResponse?.interviewCoin,
         }));
-      } catch (error) {
-        setLoading(false);
-        alert("Failed to use coins.");
-        return;
+      } catch (coinErr) {
+        console.warn("Coin deduction note:", coinErr.message);
       }
-      const formData = new FormData();
-      formData.append("resume", file);
 
-      const response = await api.post("/api/resume/upload", formData);
       dispatch(setResume(response?.data?.data));
-
       setLoading(false);
     } catch (error) {
-      alert("Upload failed");
+      console.error("Resume upload error:", error);
+      const serverMsg =
+        error?.response?.data?.message ||
+        error.message ||
+        "Upload and analysis failed.";
+      alert(`Resume Analysis Error: ${serverMsg}`);
       setLoading(false);
     }
   };
 
   //scorer section
-
   if (resume)
     return (
       <div className="min-h-screen bg-white text-[#0A0A0A] ">
@@ -254,6 +266,7 @@ function Scorer({ user, setUser }) {
         </section>
       </div>
     );
+
   //upload section
   return (
     <div className="min-h-screen bg-white text-[#0A0A0A]">

@@ -5,7 +5,6 @@ import Roadmap from "../models/roadmap.model.js";
 export const generateRoadmap = async (req, res) => {
   try {
     const { role, targetPackage, useResume = false, resume } = req.body;
-
     const userId = req.headers["x-user-id"];
 
     if (!role || !targetPackage) {
@@ -15,33 +14,42 @@ export const generateRoadmap = async (req, res) => {
       });
     }
 
-    if (useResume && !resume) {
+    if (!userId) {
       return res.status(400).json({
         success: false,
-        message: "Resume data is required",
+        message: "UserId is required (x-user-id header missing)",
       });
     }
+
+    console.log(`[Roadmap] Invoking graph for role: ${role}, useResume: ${Boolean(useResume && resume)}`);
 
     const result = await graph.invoke({
       role,
       targetPackage,
-      useResume,
-      resume,
+      useResume: Boolean(useResume && resume && resume.skills),
+      resume: resume || null,
     });
+
+    if (!result || !result.roadmap) {
+      throw new Error("AI roadmap graph produced an empty response");
+    }
 
     const roadmap = await Roadmap.create({
       userId,
       ...result.roadmap,
     });
 
-    await redis.set(
-      `roadmap:${roadmap._id}`,
-      JSON.stringify(roadmap),
-      "EX",
-      60 * 60,
-    );
-
-    await redis.del(`userRoadmaps:${userId}`);
+    try {
+      await redis.set(
+        `roadmap:${roadmap._id}`,
+        JSON.stringify(roadmap),
+        "EX",
+        60 * 60,
+      );
+      await redis.del(`userRoadmaps:${userId}`);
+    } catch (redisErr) {
+      console.warn("Redis caching note:", redisErr.message);
+    }
 
     return res.status(201).json({
       success: true,
@@ -49,11 +57,16 @@ export const generateRoadmap = async (req, res) => {
       data: roadmap,
     });
   } catch (error) {
-    console.log(error);
+    console.error("Roadmap generation error:", error);
+
+    const errorMessage =
+      error?.response?.data?.error?.message ||
+      error.message ||
+      "Failed to generate roadmap";
 
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: errorMessage,
     });
   }
 };
@@ -61,27 +74,40 @@ export const generateRoadmap = async (req, res) => {
 export const getAllRoadmap = async (req, res) => {
   try {
     const userId = req.headers["x-user-id"];
-
-    const cache = await redis.get(`userRoadmaps:${userId}`);
-
-    if (cache) {
+    if (!userId) {
       return res.status(200).json({
         success: true,
-        fromCache: true,
-        data: JSON.parse(cache),
+        data: [],
       });
+    }
+
+    try {
+      const cache = await redis.get(`userRoadmaps:${userId}`);
+      if (cache) {
+        return res.status(200).json({
+          success: true,
+          fromCache: true,
+          data: JSON.parse(cache),
+        });
+      }
+    } catch (redisErr) {
+      console.warn("Redis get note:", redisErr.message);
     }
 
     const roadmap = await Roadmap.find({ userId }).sort({
       createdAt: -1,
     });
 
-    await redis.set(
-      `userRoadmaps:${userId}`,
-      JSON.stringify(roadmap),
-      "EX",
-      60 * 60,
-    );
+    try {
+      await redis.set(
+        `userRoadmaps:${userId}`,
+        JSON.stringify(roadmap),
+        "EX",
+        60 * 60,
+      );
+    } catch (redisErr) {
+      console.warn("Redis set note:", redisErr.message);
+    }
 
     return res.status(200).json({
       success: true,
@@ -89,9 +115,8 @@ export const getAllRoadmap = async (req, res) => {
       data: roadmap,
     });
   } catch (error) {
-    console.log(error);
-
-    return res.status(400).json({
+    console.error("getAllRoadmap Error:", error);
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
@@ -103,14 +128,17 @@ export const getRoadmapbyId = async (req, res) => {
     const { id } = req.params;
     const userId = req.headers["x-user-id"];
 
-    const cache = await redis.get(`roadmap:${id}`);
-
-    if (cache) {
-      return res.status(200).json({
-        success: true,
-        fromCache: true,
-        data: JSON.parse(cache),
-      });
+    try {
+      const cache = await redis.get(`roadmap:${id}`);
+      if (cache) {
+        return res.status(200).json({
+          success: true,
+          fromCache: true,
+          data: JSON.parse(cache),
+        });
+      }
+    } catch (redisErr) {
+      console.warn("Redis get note:", redisErr.message);
     }
 
     const roadmap = await Roadmap.findOne({
@@ -125,7 +153,11 @@ export const getRoadmapbyId = async (req, res) => {
       });
     }
 
-    await redis.set(`roadmap:${id}`, JSON.stringify(roadmap), "EX", 60 * 60);
+    try {
+      await redis.set(`roadmap:${id}`, JSON.stringify(roadmap), "EX", 60 * 60);
+    } catch (redisErr) {
+      console.warn("Redis set note:", redisErr.message);
+    }
 
     return res.status(200).json({
       success: true,
@@ -133,9 +165,8 @@ export const getRoadmapbyId = async (req, res) => {
       data: roadmap,
     });
   } catch (error) {
-    console.log(error);
-
-    return res.status(400).json({
+    console.error("getRoadmapbyId Error:", error);
+    return res.status(500).json({
       success: false,
       message: error.message,
     });

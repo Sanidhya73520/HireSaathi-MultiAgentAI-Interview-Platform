@@ -59,11 +59,32 @@ function Roadmap({ user, setUser }) {
       console.log(error);
     }
   };
+
   const handleGenerate = async () => {
     if (!role.trim() || loading) return;
+
+    if ((user?.interviewCoin || 0) < 20) {
+      alert("Insufficient coins! You need at least 20 coins to generate a roadmap.");
+      return;
+    }
+
+    if (useResume && (!resume || !resume.skills)) {
+      alert("No analyzed resume found! Please upload your resume in the Scorer section first, or toggle off 'Resume'.");
+      return;
+    }
+
     setLoading(true);
     setError("");
+
     try {
+      const response = await api.post("/api/roadmap/generate", {
+        role: role.trim(),
+        targetPackage,
+        useResume: Boolean(useResume && resume && resume.skills),
+        resume: resume || undefined,
+      });
+
+      // Deduct coins ONLY after the AI generation succeeds
       try {
         const coinResponse = await useCoins({
           coins: 20,
@@ -73,28 +94,25 @@ function Roadmap({ user, setUser }) {
           ...prev,
           interviewCoin: coinResponse?.interviewCoin,
         }));
-      } catch (error) {
-        setLoading(false);
-        alert("Failed to use coins.");
-        return;
+      } catch (coinErr) {
+        console.warn("Coin deduction note:", coinErr.message);
       }
-      const response = await api.post("/api/roadmap/generate", {
-        role: role.trim(),
-        targetPackage,
-        useResume,
-        resume,
-      });
+
       setRoadmap(response.data.data);
       getAllRoadmaps();
       setLoading(false);
     } catch (error) {
       console.error("Failed to generate roadmap:", error);
-      setError(
-        "Something went wrong while generating your roadmap. Please try again.",
-      );
+      const serverMsg =
+        error?.response?.data?.message ||
+        error.message ||
+        "Something went wrong while generating your roadmap.";
+      setError(serverMsg);
+      alert(`Roadmap Error: ${serverMsg}`);
       setLoading(false);
     }
   };
+
   return (
     <div className="min-h-screen bg-white text-[#0A0A0A] flex flex-col">
       <motion.nav

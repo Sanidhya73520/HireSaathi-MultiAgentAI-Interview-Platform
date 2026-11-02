@@ -90,7 +90,11 @@ export const startInterview = async (req, res) => {
       question: interview.questions[0],
     });
   } catch (error) {
-    console.log(error);
+    console.error("Start Interview Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error?.response?.data?.error?.message || error.message || "Failed to start interview",
+    });
   }
 };
 
