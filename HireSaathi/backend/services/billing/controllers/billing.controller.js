@@ -3,6 +3,7 @@ import Billing from "../models/billing.model.js";
 import crypto from "crypto";
 import dotenv from "dotenv";
 dotenv.config();
+
 const PLANS = {
   starter: {
     amount: 199,
@@ -12,6 +13,13 @@ const PLANS = {
 
 export const createOrder = async (req, res) => {
   try {
+    if (!razorpay) {
+      return res.status(503).json({
+        success: false,
+        message: "Razorpay payment gateway is not configured on the server. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.",
+      });
+    }
+
     const { planId } = req.body;
     const userId = req.headers["x-user-id"];
     const plan = PLANS[planId];
@@ -40,10 +48,10 @@ export const createOrder = async (req, res) => {
       order,
     });
   } catch (error) {
-    console.log(error);
+    console.error("Failed to create order:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to create order",
+      message: error.message || "Failed to create order",
     });
   }
 };
@@ -59,6 +67,13 @@ export const verifyPayment = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Payment not found",
+      });
+    }
+
+    if (!process.env.RAZORPAY_KEY_SECRET) {
+      return res.status(500).json({
+        success: false,
+        message: "RAZORPAY_KEY_SECRET is not configured on server",
       });
     }
 
@@ -90,18 +105,18 @@ export const verifyPayment = async (req, res) => {
       message: "Payment successful"
     });
   } catch (error) {
-    console.log(error);
+    console.error("Payment Verification failed:", error);
     if (req.body?.razorpay_order_id) {
       await Billing.findOneAndUpdate(
         {
-          razorpayOrderId: razorpay_order_id,
+          razorpayOrderId: req.body.razorpay_order_id,
         },
         { status: "failed" },
       );
     }
     return res.status(500).json({
       success: false,
-      message: "Payment Verification failed",
+      message: error.message || "Payment Verification failed",
     });
   }
 };

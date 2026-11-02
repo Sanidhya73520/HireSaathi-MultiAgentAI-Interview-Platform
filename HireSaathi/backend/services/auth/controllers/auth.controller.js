@@ -3,9 +3,24 @@ import { getAuth } from "firebase-admin/auth";
 import User from "../models/user.model.js";
 import crypto from "crypto";
 import redis from "../../../shared/redis/redis.js";
+
 export const GoogleAuth = async (req, res) => {
   try {
     const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Firebase ID token is required",
+      });
+    }
+
+    if (!app) {
+      return res.status(500).json({
+        success: false,
+        message: "Firebase is not configured on the server. Set FIREBASE_SERVICE_ACCOUNT environment variable.",
+      });
+    }
+
     const decoded = await getAuth(app).verifyIdToken(token);
     let user = await User.findOne({
       firebaseUid: decoded.uid,
@@ -13,7 +28,7 @@ export const GoogleAuth = async (req, res) => {
     if (!user) {
       user = await User.create({
         firebaseUid: decoded.uid,
-        name: decoded.name,
+        name: decoded.name || decoded.email.split("@")[0],
         email: decoded.email,
       });
     }
@@ -31,7 +46,7 @@ export const GoogleAuth = async (req, res) => {
       7 * 24 * 60 * 60,
     );
     res.cookie("session", sessionId, {
-      httponly: true,
+      httpOnly: true,
       secure: true,
       sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -39,6 +54,7 @@ export const GoogleAuth = async (req, res) => {
 
     return res.status(200).json({ success: true, user });
   } catch (error) {
+    console.error("Google Auth Error:", error);
     return res.status(500).json({
       success: false,
       message: "Google Auth Error",
@@ -47,8 +63,6 @@ export const GoogleAuth = async (req, res) => {
   }
 };
 
-//agr mongodb mai user exist krta hai toh login kra dega nhi toh signup kra dega
-
 export const logout = async (req, res) => {
   try {
     const sessionId = req.cookies?.session;
@@ -56,7 +70,7 @@ export const logout = async (req, res) => {
       await redis.del(`session:${sessionId}`);
     }
     res.clearCookie("session", {
-      httponly: true,
+      httpOnly: true,
       secure: true,
       sameSite: "none",
     });
@@ -75,6 +89,9 @@ export const useCoins = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
     const session = await redis.get(`session:${sessionId}`);
+    if (!session) {
+      return res.status(401).json({ message: "Session Expired" });
+    }
     const sessionData = JSON.parse(session);
 
     const { coins, action } = req.body;
@@ -127,6 +144,9 @@ export const addCoins = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
     const session = await redis.get(`session:${sessionId}`);
+    if (!session) {
+      return res.status(401).json({ message: "Session Expired" });
+    }
     const sessionData = JSON.parse(session);
 
     const { coins } = req.body;

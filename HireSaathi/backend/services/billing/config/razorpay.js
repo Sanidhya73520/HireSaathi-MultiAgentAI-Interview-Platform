@@ -1,9 +1,17 @@
 import dotenv from "dotenv";
 dotenv.config();
 import Razorpay from "razorpay";
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+
+let razorpay = null;
+
+if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+  razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+  console.log("✅ Razorpay initialized");
+} else {
+  console.warn("⚠️ [WARNING] RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET not found. Razorpay billing features are disabled.");
+}
 
 export default razorpay;

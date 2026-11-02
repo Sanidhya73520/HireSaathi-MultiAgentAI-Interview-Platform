@@ -1,14 +1,12 @@
 {
-  "name": "y",
+  "name": "hiresaathi-gateway",
   "version": "1.0.0",
-  "description": "",
-  "license": "ISC",
-  "author": "",
+  "description": "HireSaathi API Gateway",
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev":"nodemon index.js",
-    "start":"node index.js"
+    "dev": "nodemon index.js",
+    "start": "node index.js"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
@@ -16,6 +14,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-http-proxy": "^2.1.2",
+    "ioredis": "^6.0.0",
     "morgan": "^1.11.0",
     "nodemon": "^3.1.14"
   }

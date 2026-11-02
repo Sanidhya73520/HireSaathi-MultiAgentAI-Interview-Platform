@@ -1,9 +1,12 @@
 import fs from "fs";
+import path from "path";
+import os from "os";
 import multer from "multer";
-const uploadPath = "../uploads";
+
+const uploadPath = path.join(os.tmpdir(), "hiresaathi-uploads");
 
 if (!fs.existsSync(uploadPath)) {
-  fs.mkdirSync(uploadPath);
+  fs.mkdirSync(uploadPath, { recursive: true });
 }
 
 const storage = multer.diskStorage({
@@ -11,7 +14,8 @@ const storage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
-    cb(null, file.originalname);
+    const sanitized = file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
+    cb(null, `${Date.now()}-${sanitized}`);
   },
 });
 
@@ -30,6 +34,3 @@ export const upload = multer({
     fileSize: 20 * 1024 * 1024,
   },
 });
-
-
-
